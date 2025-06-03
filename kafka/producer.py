@@ -1,21 +1,19 @@
 from kafka import KafkaProducer
-import json, random, time
+import json
+import random
+import time
 from datetime import datetime
 
-# ✅ Kafka Producer instance
 producer = KafkaProducer(
-    bootstrap_servers='localhost:9092',  # Kafka broker address
-    key_serializer=lambda k: k.encode('utf-8'),  # Encode the message key (symbol)
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serialize message value as JSON
+    bootstrap_servers='localhost:9092',  # usa 127.0.0.1:9092 si estás en Windows sin WSL
+    key_serializer=lambda k: k.encode('utf-8'),
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-# ✅ Generate a list of 500 stock symbols (STK001 to STK500)
-symbols = [f"STK{i:03d}" for i in range(1, 501)]
+symbols = [f"STK{i:03d}" for i in range(1, 6)]  # Solo 5 para pruebas
 
-# ✅ Simulate real-time streaming of stock ticks
 while True:
     for symbol in symbols:
-        # Build a tick record (a Kafka message value)
         tick = {
             "symbol": symbol,
             "timestamp": datetime.utcnow().isoformat(),
@@ -23,15 +21,8 @@ while True:
             "volume": random.randint(100, 10000)
         }
 
-        # ✅ Send to topic 'acciones-ticks'
-        # Kafka will:
-        # - Use the symbol as the key
-        # - Hash the key to determine the partition
-        # - Always route the same key to the same partition (ensures message order per symbol)
-        producer.send("acciones-ticks", key=symbol, value=tick)
-
-        # Optional: print what was sent
-        print(f"[{symbol}] Sent → ${tick['price']} @ {tick['volume']}")
-
-    # Wait 1 second before the next batch of ticks
+        # Send message and get metadata to confirm success
+        future = producer.send("acciones-ticks", key=symbol, value=tick)
+        metadata = future.get(timeout=10)
+        print(f"✅ Sent {symbol} to partition {metadata.partition}, offset {metadata.offset}")
     time.sleep(1)
